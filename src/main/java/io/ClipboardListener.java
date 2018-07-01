@@ -11,66 +11,67 @@ import java.awt.datatransfer.Transferable;
 import java.awt.event.KeyEvent;
 
 public class ClipboardListener extends Thread implements ClipboardOwner {
-	private Clipboard sysClip = Toolkit.getDefaultToolkit().getSystemClipboard();
-	private ClipboardBuffer buffer = new ClipboardBuffer();
+	private final Clipboard sysClip = Toolkit.getDefaultToolkit().getSystemClipboard();
+	private final ClipboardBuffer<Transferable> buffer = new ClipboardBuffer<>(5);
 
 	@Override
 	public void run() {
-		Transferable trans = sysClip.getContents(this);
-		takeOwnership(trans);
-		try {
-			freeze();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
+		takeOwnership(sysClip.getContents(this));
+		freeze();
 	}
 
-	private void freeze() throws InterruptedException {
-		Object obj = new Object();
-		synchronized (obj) {
-			obj.wait();
+	private void freeze() {
+		synchronized (this) {
+			try {
+				this.wait();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+				throw new RuntimeException("Execution interrupted");
+			}
 		}
 	}
 
 	@Override
 	public void lostOwnership(Clipboard c, Transferable t) {
 		try {
-			ClipboardListener.sleep(250);  //waiting e.g for loading huge elements like word's etc.
+			ClipboardListener.sleep(200); //wait for large objects processed
+			//TODO request dynamically
 		} catch(Exception e) {
-			System.out.println("Exception: " + e);
+			e.printStackTrace();
 		}
-		Transferable contents = sysClip.getContents(this);
-		try {
-			processClipboard(contents, c);
-		} catch (Exception ex) {
-			ex.printStackTrace();
-		}
-		takeOwnership(contents);
+
+		/*if ownership is lost, save clipboard content and return ownership*/
+		Transferable clipboardContent = sysClip.getContents(this);
+		saveContentToBuffer(clipboardContent);
+		takeOwnership(clipboardContent);
 	}
 
+	/*Intercept ownership on a system clipboart*/
 	private void takeOwnership(Transferable t) {
 		sysClip.setContents(t, this);
 	}
 
-	private void processClipboard(Transferable t, Clipboard c) { //your implementation
-		try {
-			if (t.isDataFlavorSupported(DataFlavor.stringFlavor)) {
-				System.out.println((String) t.getTransferData(DataFlavor.stringFlavor));
-				buffer.add(t);
-			}
-		} catch (Exception ignored) {
+	private void saveContentToBuffer(Transferable content){
+		if (content.isDataFlavorSupported(DataFlavor.stringFlavor)) {
+			buffer.push(content);
 		}
 	}
 
-	public static void type(String characters) throws AWTException {
+	private static void type(String toPaste) {
 		Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
-		StringSelection stringSelection = new StringSelection( characters );
+		StringSelection stringSelection = new StringSelection(toPaste);
 		clipboard.setContents(stringSelection, null);
-		Robot robot = new Robot();
-		robot.keyPress(KeyEvent.VK_CONTROL);
-		robot.keyPress(KeyEvent.VK_V);
-		robot.keyRelease(KeyEvent.VK_V);
-		robot.keyRelease(KeyEvent.VK_CONTROL);
+		try {
+			Robot robot = new Robot();
+			robot.keyPress(KeyEvent.VK_CONTROL);
+			robot.keyPress(KeyEvent.VK_V);
+			robot.keyRelease(KeyEvent.VK_V);
+			robot.keyRelease(KeyEvent.VK_CONTROL);
+		} catch (AWTException e) {
+			e.printStackTrace();
+		}
+
+		//System.out.println((String) t.getTransferData(DataFlavor.stringFlavor));
 
 //		jTree1.addKeyListener(new java.awt.event.KeyAdapter() {
 //

@@ -1,21 +1,20 @@
 package io;
 
-import java.awt.datatransfer.Transferable;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Stack;
 
-public class ClipboardBuffer {
-	private static final List<Transferable> clipboarBuffer;
-	static {
-		clipboarBuffer = new ArrayList<>();
+public class ClipboardBuffer<T> extends Stack<T> {
+	private int maxSize;
+
+	ClipboardBuffer(int size) {
+		super();
+		this.maxSize = size;
 	}
 
-	public void add(Transferable t){
-		clipboarBuffer.add(t);
-		print();
-	}
-
-	public void print(){
-		clipboarBuffer.forEach(System.out::println);
+	@Override
+	public T push(T object) {
+		if(this.size() > maxSize) {
+			this.remove(0);
+		}
+		return super.push(object);
 	}
 }
